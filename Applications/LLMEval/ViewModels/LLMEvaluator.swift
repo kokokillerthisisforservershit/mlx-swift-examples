@@ -44,7 +44,9 @@ class LLMEvaluator {
     private var firstTokenTime: TimeInterval = 0
 
     /// This controls which model loads.
-    var modelConfiguration = LLMRegistry.qwen3_8b_4bit
+    var modelConfiguration = ModelConfiguration(
+    id: "mlx-community/DeepSeek-R1-Distill-Qwen-1.5B-4bit-mlx"
+)
 
     /// Parameters controlling the generation output (max tokens and temperature).
     var generateParameters: GenerateParameters {
