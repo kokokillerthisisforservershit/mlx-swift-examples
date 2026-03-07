@@ -10,7 +10,10 @@ jobs:
           xcodebuild -project mlx-swift-examples.xcodeproj \
           -scheme LLMEval -configuration Release \
           -sdk iphoneos -derivedDataPath build \
-          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_ALLOWED=NO \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGN_IDENTITY="" \
+          AD_HOC_CODE_SIGNING_ALLOWED=YES
       - name: Create Package
         run: |
           mkdir -p Payload
