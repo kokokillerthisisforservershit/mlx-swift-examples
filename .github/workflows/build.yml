@@ -30,10 +30,13 @@ jobs:
           COMPILER_INDEX_STORE_ENABLE=NO \
           GENERATE_INFOPLIST_FILE=YES
 
-      - name: Inject RAM Entitlement
-        # This is the critical fix: bypasses the 3GB iOS RAM cap
+      - name: Inject RAM and Network Entitlements
         run: |
-          /usr/libexec/PlistBuddy -c "Add :com.apple.developer.kernel.increased-memory-limit bool true" build/Build/Products/Release-iphoneos/LLMEval.app/Info.plist
+          PLIST="build/Build/Products/Release-iphoneos/LLMEval.app/Info.plist"
+          # Unlock the 16GB RAM for your iPad Pro
+          /usr/libexec/PlistBuddy -c "Add :com.apple.developer.kernel.increased-memory-limit bool true" "$PLIST"
+          # Force open the network for Hugging Face downloads
+          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PLIST"ncreased-memory-limit bool true" build/Build/Products/Release-iphoneos/LLMEval.app/Info.plist
 
       - name: Manual Payload Creation
         run: |
