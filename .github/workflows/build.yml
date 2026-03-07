@@ -5,7 +5,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build LLMEval
+     - name: Build LLMEval
         run: |
           xcodebuild -project mlx-swift-examples.xcodeproj \
           -scheme LLMEval -configuration Release \
