@@ -1,0 +1,23 @@
+name: Build My AI App
+on: [push]
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build LLMEval
+        run: |
+          xcodebuild -project mlx-swift-examples.xcodeproj \
+          -scheme LLMEval -configuration Release \
+          -sdk iphoneos -derivedDataPath build \
+          CODE_SIGNING_ALLOWED=NO
+      - name: Create Package
+        run: |
+          mkdir -p Payload
+          cp -r build/Build/Products/Release-iphoneos/LLMEval.app Payload/
+          zip -r MyAI.ipa Payload
+      - name: Save My App
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyCustomAI-IPA
+          path: MyAI.ipa
