@@ -3,7 +3,7 @@ on: [push]
 
 jobs:
   build:
-    # Nuclear Change 1: Explicitly use the new ARM64 runner
+    # Nuclear Change 1: Use the specific 2026 ARM64 runner
     runs-on: macos-26
     steps:
       - name: Checkout Code
@@ -11,11 +11,12 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Force Xcode Version
-        # Nuclear Change 2: Ensure we are using the modern compiler
-        run: sudo xcode-select -s /Applications/Xcode_16.app
+      - name: Force Modern Xcode
+        # Nuclear Change 2: Use the 2026 stable version (26.2) 
+        # instead of the old Xcode 16 path
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app
 
-      - name: Nuclear Resolve
+      - name: Nuclear Package Resolve
         run: xcodebuild -resolvePackageDependencies -project mlx-swift-examples.xcodeproj
 
       - name: Nuclear Build
@@ -32,15 +33,14 @@ jobs:
           COMPILER_INDEX_STORE_ENABLE=NO \
           GENERATE_INFOPLIST_FILE=YES
 
-      - name: Manual IPA Creation
-        # Nuclear Change 3: We don't use 'xcodebuild archive'. 
-        # We manually grab the app and zip it.
+      - name: Manual Payload Creation
+        # Nuclear Change 3: Bypass Apple's export system entirely
         run: |
           mkdir -p Payload
           cp -r build/Build/Products/Release-iphoneos/LLMEval.app Payload/
           zip -r MyAI.ipa Payload
 
-      - name: Upload Result
+      - name: Save My App
         uses: actions/upload-artifact@v4
         with:
           name: MyCustomAI-IPA
