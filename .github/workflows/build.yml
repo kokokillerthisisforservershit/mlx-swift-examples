@@ -1,16 +1,25 @@
 name: Build My AI App
 on: [push]
+
 jobs:
   build:
-    runs-on: macos-latest
+    # Nuclear Change 1: Explicitly use the new ARM64 runner
+    runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
-      - name: Build LLMEval
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Force Xcode Version
+        # Nuclear Change 2: Ensure we are using the modern compiler
+        run: sudo xcode-select -s /Applications/Xcode_16.app
+
+      - name: Nuclear Resolve
+        run: xcodebuild -resolvePackageDependencies -project mlx-swift-examples.xcodeproj
+
+      - name: Nuclear Build
         run: |
-          # 1. Update submodules (MLX needs these to see the C++ core)
-          git submodule update --init --recursive
-          
-          # 2. Build with "No-Signing" flags + skip package validation
           xcodebuild -project mlx-swift-examples.xcodeproj \
           -scheme LLMEval \
           -configuration Release \
@@ -20,13 +29,18 @@ jobs:
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGN_IDENTITY="" \
           AD_HOC_CODE_SIGNING_ALLOWED=YES \
-          COMPILER_INDEX_STORE_ENABLE=NO
-      - name: Create Package
+          COMPILER_INDEX_STORE_ENABLE=NO \
+          GENERATE_INFOPLIST_FILE=YES
+
+      - name: Manual IPA Creation
+        # Nuclear Change 3: We don't use 'xcodebuild archive'. 
+        # We manually grab the app and zip it.
         run: |
           mkdir -p Payload
           cp -r build/Build/Products/Release-iphoneos/LLMEval.app Payload/
           zip -r MyAI.ipa Payload
-      - name: Save My App
+
+      - name: Upload Result
         uses: actions/upload-artifact@v4
         with:
           name: MyCustomAI-IPA
