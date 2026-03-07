@@ -33,11 +33,12 @@ jobs:
       - name: Inject RAM and Network Entitlements
         run: |
           PLIST="build/Build/Products/Release-iphoneos/LLMEval.app/Info.plist"
-          # Unlock the 16GB RAM for your iPad Pro
+          
+          # 1. Unlock 16GB RAM for your iPad Pro
           /usr/libexec/PlistBuddy -c "Add :com.apple.developer.kernel.increased-memory-limit bool true" "$PLIST"
-          # Force open the network for Hugging Face downloads
-          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PLIST"ncreased-memory-limit bool true" build/Build/Products/Release-iphoneos/LLMEval.app/Info.plist
-
+          
+          # 2. Force open the network for Hugging Face downloads
+          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PLIST"
       - name: Manual Payload Creation
         run: |
           mkdir -p Payload
