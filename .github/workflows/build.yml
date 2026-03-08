@@ -16,6 +16,22 @@ jobs:
       - name: Nuclear Package Resolve
         run: xcodebuild -resolvePackageDependencies -project mlx-swift-examples.xcodeproj
 
+      - name: Inject RAM and Network Entitlement
+        run: |
+          # Use a dedicated entitlements file for the RAM unlock
+          cat <<EOF > App.entitlements
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>com.apple.developer.kernel.increased-memory-limit</key>
+              <true/>
+              <key>com.apple.developer.kernel.extended-virtual-addressing</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+
       - name: Nuclear Build
         run: |
           xcodebuild -project mlx-swift-examples.xcodeproj \
@@ -25,20 +41,9 @@ jobs:
           -derivedDataPath build \
           CODE_SIGNING_ALLOWED=NO \
           CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGN_IDENTITY="" \
-          AD_HOC_CODE_SIGNING_ALLOWED=YES \
-          COMPILER_INDEX_STORE_ENABLE=NO \
-          GENERATE_INFOPLIST_FILE=YES
-
-      - name: Inject RAM and Network Entitlement
-        run: |
-          PLIST="build/Build/Products/Release-iphoneos/LLMEval.app/Info.plist"
-          # Unlock the 16GB/8GB RAM
-          /usr/libexec/PlistBuddy -c "Add :com.apple.developer.kernel.increased-memory-limit bool true" "$PLIST"
-          # Allow background downloads and large file transfers
-          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string fetch" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PLIST"
+          CODE_SIGN_ENTITLEMENTS=App.entitlements \
+          AD_HOC_CODE_SIGNING_ALLOWED=YES
+          
       - name: Manual Payload Creation
         run: |
           mkdir -p Payload
