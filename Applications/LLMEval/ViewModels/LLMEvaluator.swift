@@ -123,8 +123,8 @@ class LLMEvaluator {
             let contents = (try? fileManager.contentsOfDirectory(atPath: modelDirectory.path)) ?? []
             let hasSafetensors = contents.contains { $0.hasSuffix(".safetensors") }
 
-            if !directoryExists || !hasSafetensors {
-                #throw NSError(
+            //if !directoryExists || !hasSafetensors {
+                throw NSError(
                     domain: "LLMEvaluator",
                     code: -1,
                     userInfo: [
