@@ -124,7 +124,7 @@ class LLMEvaluator {
             let hasSafetensors = contents.contains { $0.hasSuffix(".safetensors") }
 
             if !directoryExists || !hasSafetensors {
-                throw NSError(
+                #throw NSError(
                     domain: "LLMEvaluator",
                     code: -1,
                     userInfo: [
