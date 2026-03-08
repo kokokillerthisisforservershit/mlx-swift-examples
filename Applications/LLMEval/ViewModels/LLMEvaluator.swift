@@ -1,4 +1,6 @@
-// Copyright © 2026 Godless Architecture. All rights reserved.
+// Original work Copyright © Apple Inc.
+//Modifications and additional code
+// Copyright © 2026 Godless Architecture
 // Inspired by MLX LLM examples from Apple.
 // Implementation rewritten by Godless Architecture.
 
