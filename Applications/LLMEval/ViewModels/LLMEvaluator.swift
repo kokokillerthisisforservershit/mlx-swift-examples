@@ -1,5 +1,5 @@
 // Original work Copyright © Apple Inc.
-//Modifications and additional code
+// Modifications and additional code
 // Copyright © 2026 Godless Architecture
 // Inspired by MLX LLM examples from Apple.
 // Implementation rewritten by Godless Architecture.
@@ -23,6 +23,10 @@ class LLMEvaluator {
     var prompt = ""
     var output = ""
     var modelInfo = ""
+    
+    // --- MEMORY / HISTORY ---
+    // This keeps the conversation context alive
+    var chatHistory: [Chat.Message] = []
 
     var downloadProgress: Double?
     var totalSize: String?
@@ -93,7 +97,7 @@ class LLMEvaluator {
         )
 
         do {
-            let modelDirectory = try await downloadModel(
+            let _ = try await downloadModel(
                 hub: hub,
                 configuration: modelConfiguration
             ) { [weak self] progress in
@@ -113,7 +117,7 @@ class LLMEvaluator {
 
             let numParams = await modelContainer.perform { $0.model.numParameters() }
 
-            self.prompt = PresetPrompts.all[0].prompt
+            self.prompt = ""
             self.modelInfo = formatModelInfo(name: modelConfiguration.name, parameters: numParams)
             loadState = .loaded(modelContainer)
             return modelContainer
@@ -182,16 +186,19 @@ class LLMEvaluator {
                     self.timeToFirstToken = elapsed * 1000
                 }
             }
+            
+            // Add user message to history
+            chatHistory.append(.user(prompt))
         }
 
-        let chat: [Chat.Message] = [
-            .system("You are a helpful assistant"),
-            .user(prompt),
-        ]
-
-        var finalChat = chat
         if let toolResult {
-            finalChat.append(.tool(toolResult))
+            chatHistory.append(.tool(toolResult))
+        }
+
+        // Initialize with system prompt if history is empty or just started
+        var finalChat = chatHistory
+        if !finalChat.contains(where: { if case .system = $0 { return true }; return false }) {
+            finalChat.insert(.system("You are a helpful assistant"), at: 0)
         }
 
         let userInput = UserInput(
@@ -212,6 +219,8 @@ class LLMEvaluator {
             let stream = try await modelContainer.generate(input: lmInput, parameters: parameters)
 
             var iterator = stream.makeAsyncIterator()
+            var fullResponse = ""
+
             if let first = await iterator.next() {
                 let firstTick = Date.timeIntervalSinceReferenceDate
                 let promptTime = firstTick - start
@@ -236,91 +245,14 @@ class LLMEvaluator {
                     }
                 }
 
-                var generateTokens: Double = 1
+                var generateTokens: Double = 0
                 var pendingToolCall: ToolCall?
 
-                if let toolCall = first.toolCall {
-                    pendingToolCall = toolCall
-                } else if let chunk = first.chunk, !chunk.isEmpty {
-                    Task { @MainActor in
-                        self.output += chunk
-                        self.totalTokens += 1
-                    }
-                }
-
-                if pendingToolCall == nil {
-                    while let next = await iterator.next() {
-                        if let toolCall = next.toolCall {
-                            pendingToolCall = toolCall
-                            break
-                        }
-                        if let chunk = next.chunk, !chunk.isEmpty {
-                            Task { @MainActor in
-                                self.output += chunk
-                                self.totalTokens += 1
-                            }
-                            generateTokens += 1
-                        }
-                    }
-                }
-
-                let secondTick = Date.timeIntervalSinceReferenceDate
-                let generateTime = secondTick - firstTick
-                let generateTps = generateTokens / generateTime
-
-                Task { @MainActor in
-                    self.generationTimer?.invalidate()
-                    self.generationTimer = nil
-                    self.tokensPerSecond = generateTps
-                    self.totalTime = generateTime
-                    if self.totalTokens >= (parameters.maxTokens ?? Int.max) {
-                        self.wasTruncated = true
-                    }
-                }
-
-                if let toolCall = pendingToolCall {
-                    await self.executeToolAndContinue(toolCall: toolCall, originalPrompt: prompt)
-                }
-            }
-        } catch {
-            ttftTimer?.invalidate()
-            ttftTimer = nil
-            generationTimer?.invalidate()
-            generationTimer = nil
-            output = "Failed: \(error)"
-        }
-    }
-
-    private func executeToolAndContinue(toolCall: ToolCall, originalPrompt: String) async {
-        self.output += "\n\n[Executing tool: \(toolCall.function.name)...]\n\n"
-        let result: String
-        do {
-            result = try await toolExecutor.execute(toolCall)
-        } catch {
-            result = "Error executing tool: \(error.localizedDescription)"
-        }
-        await generate(prompt: originalPrompt, toolResult: result)
-    }
-
-    func generate() {
-        guard !running else { return }
-        let currentPrompt = prompt
-        guard !currentPrompt.isEmpty else { return }
-
-        generationTask = Task {
-            running = true
-            await generate(prompt: currentPrompt)
-            prompt = ""
-            running = false
-        }
-    }
-
-    func cancelGeneration() {
-        generationTask?.cancel()
-        ttftTimer?.invalidate()
-        ttftTimer = nil
-        generationTimer?.invalidate()
-        generationTimer = nil
-        running = false
-    }
-}
+                func processPart(_ part: GenerateResult) {
+                    if let toolCall = part.toolCall {
+                        pendingToolCall = toolCall
+                    } else if let chunk = part.chunk, !chunk.isEmpty {
+                        fullResponse += chunk
+                        Task { @MainActor in
+                            self.output += chunk
+                            self.
