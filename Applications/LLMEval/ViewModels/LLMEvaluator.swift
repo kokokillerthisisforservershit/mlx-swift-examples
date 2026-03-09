@@ -151,10 +151,12 @@ class LLMEvaluator {
 
         var finalChat = chatHistory
         
-        // FIXED SYSTEM MESSAGE CHECK
+        // --- THE UNBREAKABLE SYSTEM CHECK ---
         let hasSystem = finalChat.contains { message in
-            if case .system = message { return true }
-            return false
+            switch message {
+            case .system: return true
+            default: return false
+            }
         }
         
         if !hasSystem {
