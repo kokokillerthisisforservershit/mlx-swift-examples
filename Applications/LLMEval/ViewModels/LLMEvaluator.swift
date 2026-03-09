@@ -24,7 +24,6 @@ class LLMEvaluator {
     var output = ""
     var modelInfo = ""
     
-    // --- MEMORY / HISTORY ---
     var chatHistory: [Chat.Message] = []
 
     var downloadProgress: Double?
@@ -163,7 +162,11 @@ class LLMEvaluator {
             finalChat.insert(.system, at: 0)
         }
 
-        let userInput = UserInput(chat: finalChat, tools: includeWeatherTool ? toolExecutor.allToolSchemas : nil, additionalContext: ["enable_thinking": enableThinking])
+        let userInput = UserInput(
+            chat: finalChat,
+            tools: includeWeatherTool ? toolExecutor.allToolSchemas : nil,
+            additionalContext: ["enable_thinking": enableThinking]
+        )
 
         do {
             let modelContainer = try await load()
