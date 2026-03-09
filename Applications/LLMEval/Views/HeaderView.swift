@@ -1,4 +1,5 @@
 // Copyright © 2025 Apple Inc.
+// Band link modification © 2026
 
 import SwiftUI
 
@@ -7,6 +8,8 @@ struct HeaderView: View {
     @Binding var selectedDisplayStyle: ContentView.DisplayStyle
 
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
+
+    private let bandTikTok = URL(string: "https://www.tiktok.com/@godlessarchitecture")!
 
     var status: some View {
         // Model info with status
@@ -22,6 +25,21 @@ struct HeaderView: View {
             }
 
             Spacer()
+
+            // TikTok Button
+            Link(destination: bandTikTok) {
+                HStack(spacing: 6) {
+                    Image(systemName: "music.note")
+                    Text("Godless Architecture")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(.black)
+                .foregroundColor(.white)
+                .cornerRadius(8)
+            }
 
             if llm.running {
                 HStack(spacing: 8) {
