@@ -147,18 +147,20 @@ class LLMEvaluator {
             chatHistory.append(.user(prompt))
         }
 
-        if let toolResult { chatHistory.append(.tool(toolResult)) }
+        if let toolResult {
+            chatHistory.append(.tool(toolResult))
+        }
 
         var finalChat = chatHistory
         
         // --- THE UNBREAKABLE SYSTEM CHECK ---
         let hasSystem = finalChat.contains { message in
             switch message {
-            case .system: return true
+            case .system(_): return true
             default: return false
             }
         }
-        
+
         if !hasSystem {
             finalChat.insert(.system("You are a helpful assistant"), at: 0)
         }
