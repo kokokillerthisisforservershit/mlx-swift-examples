@@ -153,16 +153,14 @@ class LLMEvaluator {
 
         var finalChat = chatHistory
         
-        // --- THE UNBREAKABLE SYSTEM CHECK ---
+        // --- SYSTEM CHECK ---
         let hasSystem = finalChat.contains { message in
-            switch message {
-            case .system(_): return true
-            default: return false
-            }
+            if case .system = message { return true }
+            return false
         }
 
         if !hasSystem {
-            finalChat.insert(.system("You are a helpful assistant"), at: 0)
+            finalChat.insert(.system, at: 0)
         }
 
         let userInput = UserInput(chat: finalChat, tools: includeWeatherTool ? toolExecutor.allToolSchemas : nil, additionalContext: ["enable_thinking": enableThinking])
