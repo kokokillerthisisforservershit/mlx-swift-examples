@@ -41,7 +41,7 @@ class LLMEvaluator {
     private var firstTokenTime: TimeInterval = 0
 
     var modelConfiguration = ModelConfiguration(
-        id: "mlx-community/DeepSeek-R1-Distill-Qwen-1.5B-4bit-mlx"
+        id: "mlx-community/DeepSeek-R1-Distill-Qwen-1.5B-4bit"
     )
 
     var generateParameters: GenerateParameters {
