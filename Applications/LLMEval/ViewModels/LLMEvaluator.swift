@@ -150,7 +150,14 @@ class LLMEvaluator {
         if let toolResult { chatHistory.append(.tool(toolResult)) }
 
         var finalChat = chatHistory
-        if !finalChat.contains(where: { if case .system = $0 { return true }; return false }) {
+        
+        // FIXED SYSTEM MESSAGE CHECK
+        let hasSystem = finalChat.contains { message in
+            if case .system = message { return true }
+            return false
+        }
+        
+        if !hasSystem {
             finalChat.insert(.system("You are a helpful assistant"), at: 0)
         }
 
