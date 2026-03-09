@@ -24,6 +24,7 @@ class LLMEvaluator {
     var output = ""
     var modelInfo = ""
     
+    // Core chat history for context
     var chatHistory: [Chat.Message] = []
 
     var downloadProgress: Double?
@@ -35,11 +36,8 @@ class LLMEvaluator {
     var totalTokens: Int = 0
     var totalTime: Double = 0.0
 
-    var wasTruncated: Bool = false
-
     private var ttftTimer: Timer?
     private var generationStartTime: TimeInterval = 0
-    private var generationTimer: Timer?
     private var firstTokenTime: TimeInterval = 0
 
     var modelConfiguration = ModelConfiguration(
@@ -85,52 +83,26 @@ class LLMEvaluator {
 
     private func performLoad() async throws -> ModelContainer {
         loadState = .loading
-        modelInfo = "Downloading \(modelName)..."
+        modelInfo = "Loading \(modelName)..."
         downloadProgress = 0.0
-        Memory.cacheLimit = 20 * 1024 * 1024
-
-        let hub = HubApi(downloadBase: FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first)
-
+        
+        let hub = HubApi()
         do {
             let _ = try await downloadModel(hub: hub, configuration: modelConfiguration) { [weak self] progress in
-                Task { @MainActor in self?.updateDownloadProgress(progress) }
+                Task { @MainActor in 
+                    self?.downloadProgress = progress.fractionCompleted 
+                }
             }
             let modelContainer = try await LLMModelFactory.shared.loadContainer(hub: hub, configuration: modelConfiguration) { _ in }
             let numParams = await modelContainer.perform { $0.model.numParameters() }
 
-            self.prompt = ""
-            self.modelInfo = formatModelInfo(name: modelConfiguration.name, parameters: numParams)
+            self.modelInfo = "\(modelConfiguration.id) • \(numParams / 1_000_000)M"
             loadState = .loaded(modelContainer)
             return modelContainer
         } catch {
-            resetLoadingState()
+            loadState = .idle
             throw error
         }
-    }
-
-    private func updateDownloadProgress(_ progress: Progress) {
-        modelInfo = "Downloading \(modelName) (\(Int(progress.fractionCompleted * 100))%)"
-        downloadProgress = progress.fractionCompleted
-        if progress.totalUnitCount > 0 {
-            totalSize = "\(formatBytes(progress.completedUnitCount)) of \(formatBytes(progress.totalUnitCount))"
-        }
-    }
-
-    private func resetLoadingState() {
-        loadState = .idle
-        downloadProgress = nil
-    }
-
-    private func formatModelInfo(name: String, parameters: Int) -> String {
-        let paramMillions = parameters / (1024 * 1024)
-        return "\(name.components(separatedBy: "/").last ?? name) • \(paramMillions >= 1000 ? String(format: "%.1fB", Double(paramMillions)/1000.0) : "\(paramMillions)M")"
-    }
-
-    private func formatBytes(_ bytes: Int64) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useMB, .useGB]
-        formatter.countStyle = .file
-        return formatter.string(fromByteCount: bytes)
     }
 
     private func generate(prompt: String, toolResult: String? = nil) async {
@@ -146,35 +118,33 @@ class LLMEvaluator {
             chatHistory.append(.user(prompt))
         }
 
-        if let toolResult {
-            chatHistory.append(.tool(toolResult))
-        }
+        if let toolResult { chatHistory.append(.tool(toolResult)) }
 
         var finalChat = chatHistory
         
-        // --- SYSTEM CHECK ---
+        // Ensure system prompt exists
         let hasSystem = finalChat.contains { message in
-            if case .system = message { return true }
-            return false
+            switch message {
+            case .system: return true
+            default: return false
+            }
         }
-
+        
         if !hasSystem {
-            finalChat.insert(.system, at: 0)
+            finalChat.insert(.system("You are a helpful assistant"), at: 0)
         }
 
         let userInput = UserInput(
-            chat: finalChat,
+            chat: finalChat, 
             tools: includeWeatherTool ? toolExecutor.allToolSchemas : nil,
             additionalContext: ["enable_thinking": enableThinking]
         )
 
         do {
             let modelContainer = try await load()
-            MLXRandom.seed(UInt64(Date.timeIntervalSinceReferenceDate * 1000))
-
             let lmInput = try await modelContainer.prepare(input: userInput)
             self.promptLength = lmInput.text.tokens.size
-            let start = Date.timeIntervalSinceReferenceDate
+            
             let stream = try await modelContainer.generate(input: lmInput, parameters: generateParameters)
 
             var fullResponse = ""
@@ -185,7 +155,6 @@ class LLMEvaluator {
                     self.ttftTimer?.invalidate()
                     self.ttftTimer = nil
                     self.firstTokenTime = Date.timeIntervalSinceReferenceDate
-                    self.timeToFirstToken = (self.firstTokenTime - start) * 1000
                 }
 
                 if let toolCall = part.toolCall {
@@ -195,28 +164,23 @@ class LLMEvaluator {
                     fullResponse += chunk
                     self.output += chunk
                     self.totalTokens += 1
+                    
                     let elapsed = Date.timeIntervalSinceReferenceDate - self.firstTokenTime
                     if elapsed > 0 {
                         self.tokensPerSecond = Double(self.totalTokens) / elapsed
-                        self.totalTime = elapsed
                     }
                 }
             }
 
-            if pendingToolCall == nil {
+            if let toolCall = pendingToolCall {
+                let result = (try? await toolExecutor.execute(toolCall)) ?? "Error"
+                await generate(prompt: prompt, toolResult: result)
+            } else {
                 self.chatHistory.append(.assistant(fullResponse))
-            } else if let toolCall = pendingToolCall {
-                await self.executeToolAndContinue(toolCall: toolCall, originalPrompt: prompt)
             }
         } catch {
-            output = "Failed: \(error)"
+            output = "Error: \(error)"
         }
-    }
-
-    private func executeToolAndContinue(toolCall: ToolCall, originalPrompt: String) async {
-        self.output += "\n\n[Executing tool: \(toolCall.function.name)...]\n\n"
-        let result = (try? await toolExecutor.execute(toolCall)) ?? "Error executing tool"
-        await generate(prompt: originalPrompt, toolResult: result)
     }
 
     func generate() {
